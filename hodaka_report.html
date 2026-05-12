@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ほうかごレポート AI</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif; background: #f5f5f5; min-height: 100vh; padding: 20px 16px 60px; }
+  .container { max-width: 680px; margin: 0 auto; background: #fff; border-radius: 16px; padding: 24px; box-shadow: 0 2px 16px rgba(0,0,0,0.08); }
+
+  /* ヘッダー */
+  .header { display: flex; align-items: center; gap: 10px; padding-bottom: 18px; border-bottom: 1px solid #eee; margin-bottom: 20px; }
+  .logo { width: 36px; height: 36px; background: #085041; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .logo-text { font-size: 17px; font-weight: 700; color: #1a1a1a; }
+  .logo-sub { font-size: 11px; color: #888; }
+  .badge { margin-left: auto; background: #E1F5EE; color: #085041; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+
+  /* はじめてガイド */
+  .guide-banner { background: linear-gradient(135deg, #E1F5EE 0%, #f0faf6 100%); border: 1px solid #b2e0cf; border-radius: 12px; padding: 14px 16px; margin-bottom: 20px; }
+  .guide-title { font-size: 13px; font-weight: 700; color: #085041; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+  .guide-steps { display: flex; gap: 0; }
+  .guide-step { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; position: relative; }
+  .guide-step:not(:last-child)::after { content: "→"; position: absolute; right: -8px; top: 10px; font-size: 12px; color: #1D9E75; }
+  .guide-step-num { width: 24px; height: 24px; border-radius: 50%; background: #1D9E75; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .guide-step-text { font-size: 10px; color: #085041; text-align: center; line-height: 1.4; font-weight: 600; }
+  .guide-close { float: right; background: none; border: none; font-size: 16px; color: #aaa; cursor: pointer; margin-top: -4px; }
+
+  /* ステップ */
+  .steps { display: flex; align-items: center; gap: 6px; margin-bottom: 22px; }
+  .step { display: flex; align-items: center; gap: 5px; }
+  .step-num { width: 22px; height: 22px; border-radius: 50%; background: #e0e0e0; color: #aaa; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+  .step-num.active { background: #1D9E75; color: #fff; }
+  .step-num.done { background: #1D9E75; color: #fff; }
+  .step-label { font-size: 12px; color: #aaa; }
+  .step-label.active { color: #1a1a1a; font-weight: 600; }
+  .step-line { width: 24px; height: 1px; background: #e0e0e0; }
+  .step-line.done { background: #1D9E75; }
+
+  /* フォーム */
+  label { font-size: 12px; font-weight: 600; color: #555; display: block; margin-bottom: 6px; }
+  .doc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+  .doc-btn {
+    padding: 10px 12px; border-radius: 8px; border: 1.5px solid #e0e0e0;
+    background: #fff; color: #555; font-size: 12px; cursor: pointer;
+    text-align: left; display: flex; flex-direction: column; gap: 2px;
+    font-family: inherit; transition: all 0.15s;
+  }
+  .doc-btn:hover { border-color: #1D9E75; background: #f5fdf9; }
+  .doc-btn.active { border: 2px solid #1D9E75; background: #E1F5EE; color: #085041; font-weight: 600; }
+  .doc-btn-top { display: flex; align-items: center; gap: 5px; }
+  .doc-btn-sub { font-size: 10px; color: #999; font-weight: 400; padding-left: 2px; }
+  .doc-btn.active .doc-btn-sub { color: #1D9E75; }
+
+  /* 書類説明カード */
+  .doc-hint {
+    background: #f8fcfa; border: 1px solid #c5e8d8; border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 16px;
+    display: flex; gap: 10px; align-items: flex-start;
+    animation: fadeIn 0.2s ease;
+  }
+  .doc-hint-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+  .doc-hint-title { font-size: 12px; font-weight: 700; color: #085041; margin-bottom: 3px; }
+  .doc-hint-desc { font-size: 12px; color: #444; line-height: 1.6; }
+  .doc-hint-write { font-size: 11px; color: #1D9E75; margin-top: 5px; font-weight: 600; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+  .name-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  input[type="text"] { width: 100%; padding: 9px 11px; border: 1.5px solid #e0e0e0; border-radius: 8px; font-size: 13px; outline: none; font-family: inherit; }
+  input[type="text"]:focus { border-color: #1D9E75; }
+
+  /* 音声エリア */
+  .input-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .sample-btn { font-size: 11px; color: #1D9E75; background: none; border: none; cursor: pointer; font-weight: 600; font-family: inherit; }
+  .clear-btn { font-size: 11px; color: #e05050; background: none; border: none; cursor: pointer; font-family: inherit; }
+
+  .voice-btn { width: 100%; padding: 12px; border-radius: 8px; border: 1.5px solid #1D9E75; background: #E1F5EE; color: #085041; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px; font-family: inherit; transition: all 0.15s; }
+  .voice-btn.listening { border-color: #e05050; background: #fff5f5; color: #c0392b; }
+  .voice-dot { width: 10px; height: 10px; border-radius: 50%; background: #e05050; animation: pulse 1s ease-in-out infinite; }
+  .interim { font-size: 12px; color: #888; background: #f9f9f9; border: 1px dashed #ccc; border-radius: 8px; padding: 6px 10px; margin-bottom: 6px; font-style: italic; }
+
+  textarea { width: 100%; padding: 10px 12px; border: 1.5px solid #e0e0e0; border-radius: 8px; font-size: 13px; line-height: 1.7; resize: vertical; outline: none; font-family: inherit; min-height: 120px; transition: border-color 0.2s; }
+  textarea.listening { border-color: #1D9E75; }
+  textarea:focus { border-color: #1D9E75; }
+  .char-count { display: flex; justify-content: space-between; font-size: 11px; color: #aaa; margin-top: 4px; }
+
+  /* エラー */
+  .error { background: #fff0f0; color: #c0392b; font-size: 12px; padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; line-height: 1.5; }
+
+  /* 生成ボタン */
+  .generate-btn { width: 100%; padding: 14px; background: #1D9E75; color: #fff; border: none; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-family: inherit; margin-top: 12px; }
+  .generate-btn:disabled { background: #ccc; cursor: default; }
+  .spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite; }
+
+  /* プレビュー */
+  .success-badge { background: #E1F5EE; border: 1px solid #1D9E75; border-radius: 10px; padding: 10px 14px; display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+  .success-title { font-size: 13px; font-weight: 600; color: #085041; }
+  .success-sub { font-size: 11px; color: #1D9E75; }
+  .doc-preview { border: 1.5px solid #e0e0e0; border-radius: 12px; overflow: hidden; margin-bottom: 14px; }
+  .doc-header { background: #085041; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
+  .doc-title { font-size: 14px; font-weight: 700; color: #fff; }
+  .doc-meta { font-size: 11px; color: rgba(255,255,255,0.7); margin-top: 2px; }
+  .doc-ai-badge { background: rgba(255,255,255,0.15); color: #fff; font-size: 10px; padding: 3px 8px; border-radius: 6px; }
+  .doc-body { padding: 16px; }
+  .section { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid #f0f0f0; }
+  .section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .section-heading { font-size: 11px; font-weight: 700; color: #1D9E75; margin-bottom: 5px; letter-spacing: 0.05em; }
+  .section-content { font-size: 13px; color: #333; line-height: 1.8; white-space: pre-wrap; }
+  .notes-box { background: #fffbf0; border: 1px solid #f0d080; border-radius: 8px; padding: 8px 12px; margin-top: 12px; }
+  .notes-label { font-size: 11px; font-weight: 700; color: #b07000; margin-bottom: 3px; }
+  .notes-text { font-size: 12px; color: #664400; line-height: 1.7; }
+  .tips-box { background: #f8f8ff; border: 1px solid #d0d0f0; border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
+  .tips-title { font-size: 12px; font-weight: 700; color: #5555aa; margin-bottom: 8px; }
+  .tip-item { font-size: 12px; color: #555; margin-bottom: 5px; padding-left: 14px; position: relative; }
+  .tip-item::before { content: "•"; position: absolute; left: 0; color: #8888cc; }
+  .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+  .copy-btn { padding: 11px; background: #fff; border: 1.5px solid #1D9E75; color: #1D9E75; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .pdf-btn { padding: 11px; background: #1D9E75; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .back-btn { width: 100%; padding: 10px; background: #f5f5f5; border: none; color: #666; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit; }
+
+  /* 非対応メッセージ */
+  .no-voice { font-size: 12px; color: #999; margin-bottom: 8px; padding: 8px 10px; background: #f5f5f5; border-radius: 8px; }
+
+  @keyframes spin  { to { transform: rotate(360deg); } }
+  @keyframes pulse { 0%,100%{ opacity:1; } 50%{ opacity:0.3; } }
+
+  /* 事業所情報セクション */
+  .section-toggle { width: 100%; background: #f8f8f8; border: 1.5px solid #e0e0e0; border-radius: 8px; padding: 10px 14px; font-size: 12px; font-weight: 600; color: #555; cursor: pointer; text-align: left; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-family: inherit; }
+  .section-toggle:hover { background: #f0f0f0; }
+  .section-toggle .toggle-arrow { transition: transform 0.2s; }
+  .section-toggle.open .toggle-arrow { transform: rotate(180deg); }
+  .collapsible { display: none; margin-bottom: 14px; }
+  .collapsible.open { display: block; }
+  .field-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+  .field-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+  .saved-badge { font-size: 10px; color: #1D9E75; font-weight: 600; margin-left: 6px; }
+  /* 障害種別タグ */
+  .disability-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .dtag { padding: 5px 11px; border-radius: 20px; border: 1.5px solid #e0e0e0; font-size: 11px; color: #555; cursor: pointer; background: #fff; font-family: inherit; transition: all 0.15s; }
+  .dtag.selected { border-color: #1D9E75; background: #E1F5EE; color: #085041; font-weight: 600; }
+  @media (max-width: 480px) { .field-grid-3 { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 480px) { .doc-grid, .name-grid, .action-grid { grid-template-columns: 1fr; } .guide-steps { gap: 2px; } }
+
+
+  /* PDFアップロードエリア */
+  .pdf-upload-area { border: 2px dashed #b2e0cf; border-radius: 12px; padding: 16px; margin-bottom: 16px; text-align: center; cursor: pointer; background: #f8fcfa; transition: all 0.2s; position: relative; }
+  .pdf-upload-area:hover, .pdf-upload-area.dragover { border-color: #1D9E75; background: #E1F5EE; }
+  .pdf-upload-area input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .pdf-upload-icon { font-size: 24px; margin-bottom: 4px; }
+  .pdf-upload-text { font-size: 13px; font-weight: 600; color: #085041; }
+  .pdf-upload-sub { font-size: 11px; color: #888; margin-top: 2px; }
+  .pdf-reading { display: flex; align-items: center; gap: 8px; padding: 12px 14px; background: #f0faf6; border: 1px solid #b2e0cf; border-radius: 10px; margin-bottom: 16px; font-size: 12px; color: #085041; font-weight: 600; }
+  .pdf-result { background: #E1F5EE; border: 1px solid #1D9E75; border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; font-size: 12px; color: #085041; }
+  .pdf-result-title { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+  .pdf-result-items { display: flex; flex-direction: column; gap: 3px; color: #333; }
+  .pdf-result-item { display: flex; gap: 6px; }
+  .pdf-result-label { color: #888; min-width: 80px; }
+  .pdf-retry { font-size: 11px; color: #e05050; background: none; border: none; cursor: pointer; margin-top: 6px; font-family: inherit; }
+  /* 印刷用スタイル */
+  @media print {
+    body { background: #fff; padding: 0; }
+    .container { box-shadow: none; border-radius: 0; padding: 16px; max-width: 100%; }
+    .guide-banner, .steps, #input-screen, .action-grid, .back-btn, .tips-box { display: none !important; }
+    .doc-preview { border: 1px solid #ccc; }
+    .success-badge { border: 1px solid #ccc; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <div class="logo">📋</div>
+    <div>
+      <div class="logo-text">ほうかごレポート AI</div>
+      <div class="logo-sub">支援記録自動生成</div>
+    </div>
+    <div class="badge">β版</div>
+  </div>
+
+  <!-- はじめてガイドバナー -->
+  <div class="guide-banner" id="guide-banner">
+    <button class="guide-close" onclick="closeGuide()" title="閉じる">✕</button>
+    <div class="guide-title">✨ はじめての方へ — 3ステップで書類完成！</div>
+    <div class="guide-steps">
+      <div class="guide-step">
+        <div class="guide-step-num">1</div>
+        <div class="guide-step-text">書類の種類<br>を選ぶ</div>
+      </div>
+      <div class="guide-step">
+        <div class="guide-step-num">2</div>
+        <div class="guide-step-text">今日の様子を<br>メモする</div>
+      </div>
+      <div class="guide-step">
+        <div class="guide-step-num">3</div>
+        <div class="guide-step-text">AIが書類を<br>自動生成！</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ステップ -->
+  <div class="steps" id="steps">
+    <div class="step"><div class="step-num active" id="s1">1</div><div class="step-label active">入力</div></div>
+    <div class="step-line" id="l1"></div>
+    <div class="step"><div class="step-num" id="s2">2</div><div class="step-label">生成</div></div>
+    <div class="step-line" id="l2"></div>
+    <div class="step"><div class="step-num" id="s3">3</div><div class="step-label">確認・保存</div></div>
+  </div>
+
+  <!-- 入力画面 -->
+  <div id="input-screen">
+    <label>① どの書類を作りますか？</label>
+    <div class="doc-grid" id="doc-grid"></div>
+
+    <!-- 書類説明カード -->
+    <div class="doc-hint" id="doc-hint">
+      <div class="doc-hint-icon" id="doc-hint-icon"></div>
+      <div>
+        <div class="doc-hint-title" id="doc-hint-title"></div>
+        <div class="doc-hint-desc" id="doc-hint-desc"></div>
+        <div class="doc-hint-write" id="doc-hint-write"></div>
+      </div>
+    </div>
+
+    <!-- PDFアップロードで自動入力 -->
+    <label>📎 HUGのPDFから情報を自動入力 <span style="font-weight:400;color:#aaa">（任意）</span></label>
+    <div class="pdf-upload-area" id="pdf-upload-area"
+      ondragover="event.preventDefault();this.classList.add('dragover')"
+      ondragleave="this.classList.remove('dragover')"
+      ondrop="event.preventDefault();this.classList.remove('dragover');handlePdfDrop(event)">
+      <input type="file" accept=".pdf" onchange="handlePdfFile(this.files[0])">
+      <div class="pdf-upload-icon">📄</div>
+      <div class="pdf-upload-text">PDFをドラッグ＆ドロップ または タップして選択</div>
+      <div class="pdf-upload-sub">HUGの個別支援計画書・サービス提供記録などに対応</div>
+    </div>
+    <div id="pdf-reading" class="pdf-reading" style="display:none">
+      <span class="spinner" style="border-color:rgba(8,80,65,0.3);border-top-color:#085041"></span>
+      PDFを読み取り中... しばらくお待ちください
+    </div>
+    <div id="pdf-result" style="display:none"></div>
+
+    <!-- 事業所情報（折りたたみ） -->
+    <button class="section-toggle" id="facility-toggle" onclick="toggleSection('facility')">
+      🏢 事業所情報 <span style="font-size:10px;color:#aaa;font-weight:400">（入力すると書類に反映されます）</span>
+      <span class="toggle-arrow">▼</span>
+    </button>
+    <div class="collapsible" id="facility-section">
+      <div class="field-grid-2">
+        <div>
+          <label>事業所名</label>
+          <input type="text" id="facility-name" placeholder="例：放課後デイ ひまわり" oninput="saveFacility()">
+        </div>
+        <div>
+          <label>児童発達支援管理責任者</label>
+          <input type="text" id="facility-manager" placeholder="例：鈴木 一郎" oninput="saveFacility()">
+        </div>
+      </div>
+      <div>
+        <label>事業所所在地</label>
+        <input type="text" id="facility-address" placeholder="例：北海道札幌市中央区○○1-2-3" oninput="saveFacility()" style="width:100%;margin-bottom:8px">
+      </div>
+    </div>
+
+    <!-- 児童情報 -->
+    <div class="name-grid" style="margin-bottom:8px">
+      <div>
+        <label>児童名 <span style="font-weight:400;color:#aaa">（任意）</span></label>
+        <input type="text" id="resident-name" placeholder="例：田中 けんと">
+      </div>
+      <div>
+        <label>保護者名 <span style="font-weight:400;color:#aaa">（任意）</span></label>
+        <input type="text" id="parent-name" placeholder="例：田中 花子">
+      </div>
+    </div>
+
+    <!-- 児童詳細（折りたたみ） -->
+    <button class="section-toggle" id="child-toggle" onclick="toggleSection('child')">
+      👶 児童詳細情報 <span style="font-size:10px;color:#aaa;font-weight:400">（任意）</span>
+      <span class="toggle-arrow">▼</span>
+    </button>
+    <div class="collapsible" id="child-section">
+      <div class="field-grid-3">
+        <div>
+          <label>生年月日</label>
+          <input type="text" id="child-dob" placeholder="例：2016/04/05">
+        </div>
+        <div>
+          <label>受給者証番号</label>
+          <input type="text" id="child-cert" placeholder="例：0123456789">
+        </div>
+        <div>
+          <label>担当支援員名</label>
+          <input type="text" id="staff-name" placeholder="例：山田 花子">
+        </div>
+      </div>
+      <label>障害・診断名</label>
+      <div class="disability-tags">
+        <button class="dtag" onclick="toggleTag(this)">自閉スペクトラム症</button>
+        <button class="dtag" onclick="toggleTag(this)">ADHD</button>
+        <button class="dtag" onclick="toggleTag(this)">知的障害</button>
+        <button class="dtag" onclick="toggleTag(this)">学習障害</button>
+        <button class="dtag" onclick="toggleTag(this)">発達遅滞</button>
+        <button class="dtag" onclick="toggleTag(this)">その他</button>
+      </div>
+      <input type="text" id="disability-other" placeholder="その他・詳細（例：ASD+軽度知的障害）" style="width:100%;margin-bottom:8px">
+    </div>
+
+    <div class="input-header">
+      <label style="margin:0">② 今日の様子・気づきをメモ</label>
+      <div style="display:flex;gap:10px;align-items:center">
+        <button class="clear-btn" id="clear-btn" onclick="clearInput()" style="display:none">クリア</button>
+        <button class="sample-btn" onclick="insertSample()">入力例を見る →</button>
+      </div>
+    </div>
+
+    <div id="voice-area"></div>
+    <div id="interim-preview" class="interim" style="display:none"></div>
+
+    <textarea id="care-input" placeholder="" oninput="onInputChange()" rows="6"></textarea>
+    <div class="char-count">
+      <span id="voice-status">テキスト入力または音声入力</span>
+      <span id="char-count">0文字</span>
+    </div>
+
+    <div id="error-area" class="error" style="display:none"></div>
+    <button class="generate-btn" id="generate-btn" onclick="generate()" disabled>✨ AI書類を生成する</button>
+  </div>
+
+  <!-- プレビュー画面 -->
+  <div id="preview-screen" style="display:none">
+    <div class="success-badge">
+      <span style="font-size:18px">✅</span>
+      <div>
+        <div class="success-title">書類の生成が完了しました</div>
+        <div class="success-sub">内容を確認してPDF保存またはコピーしてください</div>
+      </div>
+    </div>
+    <div class="doc-preview">
+      <div class="doc-header">
+        <div>
+          <div class="doc-title" id="result-title"></div>
+          <div class="doc-meta" id="result-meta"></div>
+        </div>
+        <div class="doc-ai-badge">AI生成済み</div>
+      </div>
+      <div class="doc-body" id="result-sections"></div>
+    </div>
+    <div id="result-tips" class="tips-box" style="display:none">
+      <div class="tips-title">💡 記録品質の改善ヒント</div>
+      <div id="tips-list"></div>
+    </div>
+    <div class="action-grid">
+      <button class="copy-btn" id="copy-btn" onclick="copyText()">📋 テキストをコピー</button>
+      <button class="pdf-btn" onclick="printPDF()">🖨️ PDF印刷・保存</button>
+    </div>
+    <button class="back-btn" onclick="reset()">← 別の書類を作成する</button>
+  </div>
+
+</div>
+
+<script>
+var DOCUMENT_TYPES = [
+  {
+    id: "individual_plan",
+    label: "個別支援計画書",
+    icon: "📄",
+    sub: "半年ごとに作成・提出",
+    hintTitle: "個別支援計画書とは？",
+    hintDesc: "お子さんの目標・支援の方向性を6ヶ月単位でまとめる書類です。2024年改正により【5領域】の視点での記載が必須になりました。行政への提出・保護者サインが必要です。",
+    hintWrite: "✍ 書くこと：強み・課題・保護者の希望・5領域ごとの目標と支援内容",
+    placeholder: "例：けんとくん（8歳・自閉スペクトラム症）。強み：電車・数字が好きで記憶力が高い。課題：集団活動が難しく、気持ちの切り替えに時間がかかる。保護者の希望：友達と一緒に遊べるようになってほしい。現在の支援：個別活動中心、視覚支援を活用中。",
+  },
+  {
+    id: "therapy_record",
+    label: "療育支援経過記録",
+    icon: "📝",
+    sub: "来所ごとに記録",
+    hintTitle: "療育支援経過記録とは？",
+    hintDesc: "お子さんが来所した日の療育活動・様子・支援の経過をまとめて記録する書類です。サービス提供の根拠にもなるため、毎回の記録が必要です。",
+    hintWrite: "✍ 書くこと：来所時間・活動内容・療育の目標と結果・様子・次回の課題",
+    placeholder: "例：はるかちゃん（10歳・ADHD）。14時来所。今日の目標：順番を守って集団活動に参加する。宿題サポート30分（算数プリント自力で完成）、グループゲーム（UNO）で順番を守って参加できた。帰りの会で今日の出来事を笑顔で発表。17時保護者迎え、引き継ぎ実施。次回：より大きなグループでの活動に挑戦。",
+  },
+  {
+    id: "daily_log",
+    label: "業務日誌",
+    icon: "📒",
+    sub: "毎日の業務記録",
+    hintTitle: "業務日誌とは？",
+    hintDesc: "その日の施設全体の業務・活動・特記事項をまとめる記録です。スタッフ間の情報共有や運営管理の基本書類です。",
+    hintWrite: "✍ 書くこと：参加児童・活動内容・スタッフ対応・特記事項・申し送り",
+    placeholder: "例：本日の参加児童6名。午前：自由遊び・宿題サポート。午後：集団ゲーム（ドッジボール）実施、全員参加。けんとくんが初めて自分からルール説明を聞きに来た。そうたくん、帰り際に腹痛を訴えたため保護者に連絡・確認済み。申し送り：明日は避難訓練あり。",
+  },
+  {
+    id: "incident",
+    label: "ヒヤリハット・事故報告",
+    icon: "⚠️",
+    sub: "事故・危険場面の記録",
+    hintTitle: "ヒヤリハット・事故報告書とは？",
+    hintDesc: "施設内での事故・けが・危険だった出来事を記録する書類です。再発防止のため、小さなことでも記録が必要です。",
+    hintWrite: "✍ 書くこと：発生日時・場所・何が起きたか・処置・保護者への報告",
+    placeholder: "例：そうたくん（9歳）、15時30分ごろ遊戯室にて転倒。ブロック遊び中に走って移動しようとして滑った。右膝に擦り傷あり、冷却処置実施。本人はすぐに泣き止み活動継続。16時30分保護者迎え時に状況説明、同意書に署名いただいた。",
+  },
+];
+
+var EXAMPLES = {
+  individual_plan: "田中けんとくん（8歳・自閉スペクトラム症）。本人の強み：電車・数字に強い興味、記憶力が高い。課題：集団活動への参加が難しい、切り替えに時間がかかる。保護者の希望：友達と一緒に遊べるようになってほしい、感情のコントロールを身につけてほしい。5領域ごとの状況：【健康・生活】睡眠リズム安定、偏食あり；【運動・感覚】感覚過敏（大きな音が苦手）；【認知・行動】見通しが持てると落ち着いて行動できる；【言語・コミュニケーション】単語レベルで発話、絵カードで意思表示；【人間関係・社会性】1対1の関わりは好き、集団は難しい。",
+  therapy_record:  "佐藤はるかちゃん（10歳・ADHD）。14時来所。今日の目標：順番を守って集団活動に参加する。宿題サポート30分（算数プリント自力で完成、集中継続できた）、グループゲーム（UNO）で順番を守って参加できた。帰りの会では今日楽しかったことを発表、笑顔で話せた。17時保護者迎え、引き継ぎ実施。次回：より大きなグループでの活動に挑戦。",
+  daily_log:       "参加児童6名（田中、佐藤、山本、鈴木、中村、小林）。スタッフ3名対応。午前：自由遊び・宿題サポート（全員完了）。午後：集団ゲーム（ドッジボール）実施、全員参加。けんとくんが初めて自分からルール説明を聞きに来た。そうたくん、帰り際に腹痛を訴えたため保護者に連絡・状況確認済み・異常なし。申し送り：明日は避難訓練のため動きやすい服装で来所をお願い済み。",
+  incident:        "鈴木そうたくん（9歳）、15時30分ごろ遊戯室にて転倒。ブロック遊び中に走って移動しようとして滑った。すぐに声かけ、右膝に軽い擦り傷あり。冷却処置実施、本人は「痛い」と言うが泣き止み普通に活動継続。16時30分保護者迎え時に状況説明、同意書に署名いただいた。",
+};
+
+var SYSTEM_PROMPT = `あなたは放課後等デイサービス向けの支援記録自動生成AIです。支援スタッフが入力した児童の記録や状況から、正式な行政提出用書類・支援記録を生成してください。
+
+以下のルールに従ってください：
+- 児童福祉法および厚生労働省の障害児通所支援の指針に準拠した正式な文体で記載
+- 5W1Hを明確に。客観的・具体的な表現を使用（「良好」より「笑顔で発言できた」など）
+- 児童の強みや成長に着目したポジティブな表現を心がける
+- 保護者への説明にも使える平易な文体で記載
+
+【個別支援計画書の場合の特別ルール】
+2024年改正に基づき、以下の5領域それぞれについて目標と支援内容を必ず記載すること：
+1. 健康・生活（生活リズム・健康管理・身辺自立など）
+2. 運動・感覚（粗大運動・微細運動・感覚統合など）
+3. 認知・行動（学習・集中・見通し・問題解決など）
+4. 言語・コミュニケーション（表現・理解・対話など）
+5. 人間関係・社会性（友人関係・集団参加・感情調整など）
+各領域に「現状」「目標」「支援方法」を含めること。
+
+必ずJSON形式のみで返答してください。コードブロック記号は絶対に使わないでください。
+出力するJSONのキーはtitle, date, facility, sections（headingとcontentを持つオブジェクトの配列）, notes, quality_tips（文字列の配列）です。
+今日の日付は${new Date().toLocaleDateString("ja-JP")}です。`;
+
+var currentDocType = DOCUMENT_TYPES[0];
+var isListening = false;
+var recognition = null;
+
+// はじめてガイドを閉じる
+function closeGuide() {
+  document.getElementById("guide-banner").style.display = "none";
+}
+
+// 書類種別ボタン描画
+function renderDocButtons() {
+  const grid = document.getElementById("doc-grid");
+  grid.innerHTML = DOCUMENT_TYPES.map(dt =>
+    `<button class="doc-btn${dt.id===currentDocType.id?" active":""}" onclick="selectDoc('${dt.id}')">
+      <div class="doc-btn-top"><span>${dt.icon}</span>${dt.label}</div>
+      <div class="doc-btn-sub">${dt.sub}</div>
+    </button>`
+  ).join("");
+}
+
+// 書類説明カードを更新
+function updateDocHint(dt) {
+  document.getElementById("doc-hint-icon").textContent = dt.icon;
+  document.getElementById("doc-hint-title").textContent = dt.hintTitle;
+  document.getElementById("doc-hint-desc").textContent = dt.hintDesc;
+  document.getElementById("doc-hint-write").textContent = dt.hintWrite;
+  document.getElementById("care-input").placeholder = dt.placeholder;
+}
+
+function selectDoc(id) {
+  currentDocType = DOCUMENT_TYPES.find(d => d.id === id);
+  document.getElementById("care-input").value = "";
+  onInputChange();
+  document.querySelectorAll(".doc-btn").forEach(function(btn, i) {
+    if (DOCUMENT_TYPES[i].id === id) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
+  });
+  updateDocHint(currentDocType);
+}
+
+// 音声入力セットアップ
+function setupVoice() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const area = document.getElementById("voice-area");
+  if (!SR) {
+    area.innerHTML = `<div class="no-voice">⚠ このブラウザは音声入力非対応です（Chrome / Edge 推奨）</div>`;
+    return;
+  }
+  area.innerHTML = `<button class="voice-btn" id="voice-btn" onclick="toggleVoice()">🎤 タップして音声入力（日本語対応）</button>`;
+
+  recognition = new SR();
+  recognition.lang = "ja-JP";
+  recognition.continuous = false;
+  recognition.interimResults = true;
+
+  recognition.onresult = (e) => {
+    let interim = "", finalChunk = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) finalChunk += t;
+      else interim += t;
+    }
+    if (finalChunk) {
+      const ta = document.getElementById("care-input");
+      ta.value = ta.value ? ta.value + "。" + finalChunk : finalChunk;
+      onInputChange();
+    }
+    const ip = document.getElementById("interim-preview");
+    if (interim) { ip.style.display = "block"; ip.textContent = "認識中: " + interim; }
+    else { ip.style.display = "none"; }
+  };
+
+  recognition.onerror = (e) => {
+    if (e.error === "not-allowed") {
+      showError("マイクの使用が許可されていません。アドレスバー横のアイコンからマイクを「許可」にしてください。");
+    } else if (e.error !== "aborted" && e.error !== "no-speech" && e.error !== "network") {
+      showError(`音声認識エラー: ${e.error}`);
+    }
+    stopListening();
+  };
+
+  recognition.onend = () => {
+    if (isListening) {
+      isListening = false;
+      const btn = document.getElementById("voice-btn");
+      if (btn) {
+        btn.className = "voice-btn";
+        btn.innerHTML = "🎤 続けて話す（タップで再開）";
+      }
+      document.getElementById("voice-status").textContent = "認識完了 - もう一度話す場合はタップ";
+      document.getElementById("care-input").className = "";
+      document.getElementById("interim-preview").style.display = "none";
+    } else {
+      stopListening();
+    }
+  };
+}
+
+function toggleVoice() {
+  if (isListening) {
+    isListening = false;
+    try { recognition.abort(); } catch(_) {}
+    stopListeningUI();
+  } else {
+    showError(null);
+    try { recognition.abort(); } catch(_) {}
+    setTimeout(() => {
+      try {
+        recognition.start();
+        isListening = true;
+        const btn = document.getElementById("voice-btn");
+        btn.className = "voice-btn listening";
+        btn.innerHTML = `<span class="voice-dot"></span> 収音中… タップで停止`;
+        document.getElementById("voice-status").textContent = "🎤 音声入力中（話してください）";
+        document.getElementById("care-input").className = "listening";
+      } catch(e) {
+        showError("マイクの起動に失敗しました: " + e.message);
+        isListening = false;
+      }
+    }, 200);
+  }
+}
+
+function stopListeningUI() {
+  const btn = document.getElementById("voice-btn");
+  if (btn) {
+    btn.className = "voice-btn";
+    btn.innerHTML = "🎤 タップして音声入力（日本語対応）";
+  }
+  document.getElementById("voice-status").textContent = "テキスト入力または音声入力";
+  document.getElementById("care-input").className = "";
+  document.getElementById("interim-preview").style.display = "none";
+}
+
+function stopListening() {
+  isListening = false;
+  stopListeningUI();
+}
+
+function onInputChange() {
+  const val = document.getElementById("care-input").value;
+  document.getElementById("char-count").textContent = val.length + "文字";
+  document.getElementById("generate-btn").disabled = !val.trim();
+  document.getElementById("clear-btn").style.display = val ? "inline" : "none";
+}
+
+function clearInput() {
+  if (isListening) recognition?.stop();
+  document.getElementById("care-input").value = "";
+  onInputChange();
+}
+
+function insertSample() {
+  document.getElementById("care-input").value = EXAMPLES[currentDocType.id] || "";
+  onInputChange();
+  document.getElementById("care-input").focus();
+}
+
+function showError(msg) {
+  const el = document.getElementById("error-area");
+  if (msg) { el.textContent = "⚠ " + msg; el.style.display = "block"; }
+  else { el.style.display = "none"; }
+}
+
+function setStep(s) {
+  if (s === "input") {
+    document.getElementById("s1").className = "step-num active";
+    document.getElementById("s2").className = "step-num";
+    document.getElementById("s3").className = "step-num";
+    document.getElementById("l1").className = "step-line";
+    document.getElementById("l2").className = "step-line";
+  } else if (s === "loading") {
+    document.getElementById("s1").className = "step-num done"; document.getElementById("s1").textContent = "✓";
+    document.getElementById("s2").className = "step-num active";
+    document.getElementById("l1").className = "step-line done";
+  } else if (s === "preview") {
+    document.getElementById("s1").className = "step-num done"; document.getElementById("s1").textContent = "✓";
+    document.getElementById("s2").className = "step-num done"; document.getElementById("s2").textContent = "✓";
+    document.getElementById("s3").className = "step-num active";
+    document.getElementById("l1").className = "step-line done";
+    document.getElementById("l2").className = "step-line done";
+  }
+}
+
+async function generate() {
+  const input = document.getElementById("care-input").value.trim();
+  if (!input) return;
+  if (isListening) recognition?.stop();
+
+  setStep("loading");
+  showError(null);
+  const btn = document.getElementById("generate-btn");
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span> AIが書類を生成中...`;
+
+  const residentName   = document.getElementById("resident-name").value   || "";
+  const parentName     = document.getElementById("parent-name").value     || "";
+  const staffName      = document.getElementById("staff-name").value      || "";
+  const facilityName   = document.getElementById("facility-name").value   || "";
+  const facilityMgr    = document.getElementById("facility-manager").value|| "";
+  const facilityAddr   = document.getElementById("facility-address").value|| "";
+  const childDob       = document.getElementById("child-dob").value       || "";
+  const childCert      = document.getElementById("child-cert").value      || "";
+  const disabilityOther= document.getElementById("disability-other").value|| "";
+  const selectedTags   = Array.from(document.querySelectorAll(".dtag.selected")).map(b=>b.textContent);
+  const disability     = selectedTags.length ? selectedTags.join("・") + (disabilityOther ? "（" + disabilityOther + "）" : "") : disabilityOther;
+
+  const userMessage = [
+    `書類種別：${currentDocType.label}`,
+    facilityName   ? `事業所名：${facilityName}`       : "",
+    facilityAddr   ? `所在地：${facilityAddr}`         : "",
+    facilityMgr    ? `児発管：${facilityMgr}`          : "",
+    `児童名：${residentName || "（未入力）"}`,
+    parentName     ? `保護者名：${parentName}`         : "",
+    childDob       ? `生年月日：${childDob}`           : "",
+    childCert      ? `受給者証番号：${childCert}`      : "",
+    disability     ? `障害・診断名：${disability}`     : "",
+    `担当支援員：${staffName || "（未入力）"}`,
+    `支援記録：\n${input}`,
+  ].filter(Boolean).join("\n");
+
+  try {
+    const res  = await fetch("/.netlify/functions/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", , "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-5",
+        max_tokens: 4096,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: "user", content: userMessage }],
+      }),
+    });
+    const data = await res.json();
+    if (data.error) { showError("APIエラー: " + (data.error.message || JSON.stringify(data.error))); resetBtn(true); setStep("input"); return; }
+
+    const text = data.content?.map(b => b.text||"").join("") || "";
+    if (!text) { showError("AIからの応答が空でした。もう一度お試しください。"); resetBtn(true); setStep("input"); return; }
+
+    try {
+      const clean  = text.replace(/^```json\s*/i,"").replace(/^```\s*/i,"").replace(/\s*```$/i,"").trim();
+      const parsed = JSON.parse(clean);
+      renderPreview(parsed);
+      document.getElementById("input-screen").style.display  = "none";
+      document.getElementById("preview-screen").style.display = "block";
+      setStep("preview");
+    } catch {
+      showError(`JSON解析エラー。AIの返答: ${text.slice(0,120)}...`);
+      resetBtn(true);
+      setStep("input");
+    }
+  } catch(err) {
+    showError("通信エラー: " + err.message);
+    resetBtn(true);
+    setStep("input");
+  }
+}
+
+function resetBtn(enableBtn) {
+  const btn = document.getElementById("generate-btn");
+  btn.innerHTML = "✨ AI書類を生成する";
+  if (enableBtn) btn.disabled = false;
+}
+
+function renderPreview(data) {
+  document.getElementById("result-title").textContent = data.title || "";
+  document.getElementById("result-meta").textContent  = (data.facility||"") + " ／ " + (data.date||"");
+
+  const sec = document.getElementById("result-sections");
+  sec.innerHTML = (data.sections||[]).map((s,i,arr) =>
+    `<div class="section" style="${i===arr.length-1?'border-bottom:none;margin-bottom:0;padding-bottom:0':''}">
+      <div class="section-heading">${s.heading||""}</div>
+      <div class="section-content">${(s.content||"").replace(/</g,"&lt;")}</div>
+    </div>`
+  ).join("");
+
+  if (data.notes) {
+    sec.innerHTML += `<div class="notes-box"><div class="notes-label">特記事項</div><div class="notes-text">${data.notes}</div></div>`;
+  }
+
+  const tips = data.quality_tips || [];
+  if (tips.length) {
+    document.getElementById("result-tips").style.display = "block";
+    document.getElementById("tips-list").innerHTML = tips.map(t => `<div class="tip-item">${t}</div>`).join("");
+  }
+}
+
+
+function printPDF() {
+  window.print();
+}
+function copyText() {
+  const sections = document.querySelectorAll(".section");
+  let text = "";
+  sections.forEach(s => {
+    const h = s.querySelector(".section-heading")?.textContent || "";
+    const c = s.querySelector(".section-content")?.textContent || "";
+    text += `【${h}】\n${c}\n\n`;
+  });
+  navigator.clipboard.writeText(text.trim()).then(() => {
+    const btn = document.getElementById("copy-btn");
+    btn.textContent = "✓ コピーしました";
+    setTimeout(() => btn.textContent = "📋 テキストをコピー", 2000);
+  });
+}
+
+function reset() {
+  document.getElementById("input-screen").style.display  = "block";
+  document.getElementById("preview-screen").style.display = "none";
+  document.getElementById("care-input").value = "";
+  document.getElementById("result-tips").style.display = "none";
+  document.getElementById("tips-list").innerHTML = "";
+  onInputChange();
+  resetBtn();
+  setStep("input");
+}
+
+
+
+// PDF読み取り
+function handlePdfDrop(e) {
+  var file = e.dataTransfer.files[0];
+  if (file && file.type === "application/pdf") handlePdfFile(file);
+}
+
+async function handlePdfFile(file) {
+  if (!file) return;
+  document.getElementById("pdf-upload-area").style.display = "none";
+  document.getElementById("pdf-reading").style.display = "flex";
+  document.getElementById("pdf-result").style.display = "none";
+
+  try {
+    // PDFをbase64に変換
+    var base64 = await new Promise(function(resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function(e) { resolve(e.target.result.split(",")[1]); };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    var res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true"
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-5",
+        max_tokens: 1000,
+        messages: [{
+          role: "user",
+          content: [
+            {
+              type: "document",
+              source: { type: "base64", media_type: "application/pdf", data: base64 }
+            },
+            {
+              type: "text",
+              text: "この書類から以下の情報を抽出してください。見つからない項目は空文字にしてください。必ずJSONのみを返してください（コードブロック不要）。\n{\"facility_name\":\"事業所名\",\"facility_address\":\"事業所住所\",\"facility_manager\":\"児童発達支援管理責任者名\",\"child_name\":\"児童名\",\"child_dob\":\"生年月日(YYYY/MM/DD形式)\",\"child_cert\":\"受給者証番号\",\"parent_name\":\"保護者名\",\"staff_name\":\"担当支援員名\",\"disability\":\"障害・診断名\"}"
+            }
+          ]
+        }]
+      })
+    });
+
+    var data = await res.json();
+    var text = (data.content || []).map(function(b){ return b.text || ""; }).join("");
+    var clean = text.replace(/^```json\s*/i,"").replace(/^```\s*/i,"").replace(/\s*```$/i,"").trim();
+    var info = JSON.parse(clean);
+
+    // フォームに自動入力
+    var filled = [];
+    if (info.facility_name)    { document.getElementById("facility-name").value    = info.facility_name;    filled.push({label:"事業所名", value:info.facility_name}); }
+    if (info.facility_address) { document.getElementById("facility-address").value = info.facility_address; filled.push({label:"所在地", value:info.facility_address}); }
+    if (info.facility_manager) { document.getElementById("facility-manager").value = info.facility_manager; filled.push({label:"児発管", value:info.facility_manager}); }
+    if (info.child_name)       { document.getElementById("resident-name").value    = info.child_name;       filled.push({label:"児童名", value:info.child_name}); }
+    if (info.parent_name)      { document.getElementById("parent-name").value      = info.parent_name;      filled.push({label:"保護者名", value:info.parent_name}); }
+    if (info.child_dob)        { document.getElementById("child-dob").value        = info.child_dob;        filled.push({label:"生年月日", value:info.child_dob}); }
+    if (info.child_cert)       { document.getElementById("child-cert").value       = info.child_cert;       filled.push({label:"受給者証番号", value:info.child_cert}); }
+    if (info.staff_name)       { document.getElementById("staff-name").value       = info.staff_name;       filled.push({label:"担当支援員", value:info.staff_name}); }
+    if (info.disability) {
+      document.getElementById("disability-other").value = info.disability;
+      filled.push({label:"障害・診断名", value:info.disability});
+    }
+
+    // 事業所・児童詳細セクションを開く
+    if (info.facility_name || info.facility_address || info.facility_manager) {
+      document.getElementById("facility-section").classList.add("open");
+      document.getElementById("facility-toggle").classList.add("open");
+    }
+    if (info.child_dob || info.child_cert || info.staff_name || info.disability) {
+      document.getElementById("child-section").classList.add("open");
+      document.getElementById("child-toggle").classList.add("open");
+    }
+
+    saveFacility();
+
+    // 結果表示
+    document.getElementById("pdf-reading").style.display = "none";
+    var resultEl = document.getElementById("pdf-result");
+    if (filled.length > 0) {
+      resultEl.innerHTML =
+        "<div class=\"pdf-result\">" +
+        "<div class=\"pdf-result-title\">✅ " + filled.length + "件の情報を自動入力しました</div>" +
+        "<div class=\"pdf-result-items\">" +
+        filled.map(function(f){ return "<div class=\"pdf-result-item\"><span class=\"pdf-result-label\">" + f.label + "</span><span>" + f.value + "</span></div>"; }).join("") +
+        "</div>" +
+        "<button class=\"pdf-retry\" onclick=\"resetPdfUpload()\">↩ 別のPDFを読み込む</button>" +
+        "</div>";
+    } else {
+      resultEl.innerHTML =
+        "<div class=\"pdf-result\" style=\"background:#fff5f5;border-color:#e05050\">" +
+        "<div class=\"pdf-result-title\">⚠️ 情報を読み取れませんでした</div>" +
+        "<div style=\"font-size:12px;color:#555\">書類の形式によっては読み取れない場合があります。手動で入力してください。</div>" +
+        "<button class=\"pdf-retry\" onclick=\"resetPdfUpload()\">↩ 別のPDFを試す</button>" +
+        "</div>";
+    }
+    resultEl.style.display = "block";
+
+  } catch(err) {
+    document.getElementById("pdf-reading").style.display = "none";
+    var resultEl = document.getElementById("pdf-result");
+    resultEl.innerHTML =
+      "<div class=\"pdf-result\" style=\"background:#fff5f5;border-color:#e05050\">" +
+      "<div class=\"pdf-result-title\">⚠️ 読み取りエラー</div>" +
+      "<div style=\"font-size:12px;color:#555\">" + err.message + "</div>" +
+      "<button class=\"pdf-retry\" onclick=\"resetPdfUpload()\">↩ やり直す</button>" +
+      "</div>";
+    resultEl.style.display = "block";
+  }
+}
+
+function resetPdfUpload() {
+  document.getElementById("pdf-upload-area").style.display = "block";
+  document.getElementById("pdf-result").style.display = "none";
+}
+
+// セクション折りたたみ
+function toggleSection(id) {
+  var sec = document.getElementById(id + "-section");
+  var btn = document.getElementById(id + "-toggle");
+  sec.classList.toggle("open");
+  btn.classList.toggle("open");
+}
+
+// 障害タグ
+function toggleTag(el) {
+  el.classList.toggle("selected");
+}
+
+// 事業所情報をlocalStorageに保存
+function saveFacility() {
+  var data = {
+    name: document.getElementById("facility-name").value,
+    manager: document.getElementById("facility-manager").value,
+    address: document.getElementById("facility-address").value,
+  };
+  try { localStorage.setItem("facility_info", JSON.stringify(data)); } catch(e) {}
+}
+
+// 起動時に事業所情報を復元
+function loadFacility() {
+  try {
+    var saved = localStorage.getItem("facility_info");
+    if (!saved) return;
+    var data = JSON.parse(saved);
+    if (data.name)    document.getElementById("facility-name").value    = data.name;
+    if (data.manager) document.getElementById("facility-manager").value = data.manager;
+    if (data.address) document.getElementById("facility-address").value = data.address;
+    if (data.name || data.manager || data.address) {
+      // 事業所情報が保存済みなら開いておく
+      document.getElementById("facility-section").classList.add("open");
+      document.getElementById("facility-toggle").classList.add("open");
+    }
+  } catch(e) {}
+}
+
+// 初期化
+renderDocButtons();
+updateDocHint(currentDocType);
+setupVoice();
+loadFacility();
+</script>
+</body>
+</html>
